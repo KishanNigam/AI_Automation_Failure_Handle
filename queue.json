@@ -35,7 +35,7 @@
     "server": "BHSIEAS32",
     "subject": "[EXTERNAL] EAS-P5-MW - BANK1_File_Import - PROD - BHSIEAS32",
     "received_time": "2026-07-06T00:27:05+00:00",
-    "status": "APPROVED",
+    "status": "READY",
     "occurrence_count": 3,
     "analysis": {
       "failure_stage": "Job Execution",

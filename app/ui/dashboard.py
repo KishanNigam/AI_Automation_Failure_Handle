@@ -5,6 +5,7 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
+from app.outlook.sender import create_draft
 from app.queue.queue_manager import QueueManager
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ def _status_icon(status: str) -> str:
         "ANALYZING": "🔵",
         "READY": "🔴",
         "APPROVED": "🟢",
+        "DRAFT_CREATED": "📝",
         "REJECTED": "⚪",
         "SENT": "✅",
     }
@@ -146,7 +148,7 @@ def _build_view_context(selected_failure_id: str | None = None) -> dict[str, Any
     if not empty_queue and selected_failure.get("id") is not None:
         selected_failure["approve_enabled"] = selected_failure["status"] == "READY"
         selected_failure["reject_enabled"] = selected_failure["status"] == "READY"
-        selected_failure["reopen_enabled"] = selected_failure["status"] in {"APPROVED", "REJECTED"}
+        selected_failure["reopen_enabled"] = selected_failure["status"] in {"APPROVED", "REJECTED", "DRAFT_CREATED"}
     else:
         selected_failure["approve_enabled"] = False
         selected_failure["reject_enabled"] = False
@@ -287,11 +289,31 @@ def _apply_decision(action: str, failure_id: str | None) -> dict[str, Any]:
                 "is_approved": False,
             }
             return _build_view_context(record.id)
-        queue_manager.approve(record.id)
-        logger.info("Approved failure %s via dashboard action", record.id)
+
+        email_payload = record.email or {}
+        draft_result = create_draft(
+            to="",
+            cc="",
+            subject=email_payload.get("subject") or f"RCA - {record.job_name} Failure - {record.environment}",
+            body=email_payload.get("body") or "",
+        )
+        if not draft_result.get("success"):
+            logger.error("Failed to create Outlook draft for %s: %s", record.id, draft_result.get("error"))
+            _approval_state = {
+                "status": "Approved",
+                "message": "Draft creation failed",
+                "is_finalized": True,
+                "is_approved": True,
+            }
+            return _build_view_context(record.id)
+
+        record.status = "DRAFT_CREATED"
+        record.last_updated = queue_manager._timestamp()
+        queue_manager.save()
+        logger.info("Created Outlook draft for failure %s via dashboard action", record.id)
         _approval_state = {
-            "status": "Approved",
-            "message": "Approved Successfully",
+            "status": "Draft Created",
+            "message": "Draft created successfully",
             "is_finalized": True,
             "is_approved": True,
         }
@@ -318,7 +340,7 @@ def _apply_decision(action: str, failure_id: str | None) -> dict[str, Any]:
         return _build_view_context(record.id)
 
     if action == "reopen":
-        if record.status not in {"APPROVED", "REJECTED"}:
+        if record.status not in {"APPROVED", "REJECTED", "DRAFT_CREATED"}:
             logger.warning("Rejecting invalid reopen transition for %s from %s", record.id, record.status)
             _approval_state = {
                 "status": "Pending",

@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from app.queue.queue_manager import QueueManager
 from app.ui import dashboard as dashboard_module
@@ -52,17 +53,40 @@ class DashboardApprovalTests(unittest.TestCase):
         approve_response = self.client.post(f"/approve/{record.id}")
         self.assertEqual(approve_response.status_code, 200)
         reloaded = QueueManager(storage_path=self.storage_path, max_size=20).get_failure(record.id)
-        self.assertEqual(reloaded.status, "APPROVED")
+        self.assertEqual(reloaded.status, "DRAFT_CREATED")
 
         reject_response = self.client.post(f"/reject/{record.id}")
         self.assertEqual(reject_response.status_code, 200)
         reloaded = QueueManager(storage_path=self.storage_path, max_size=20).get_failure(record.id)
-        self.assertEqual(reloaded.status, "APPROVED")
+        self.assertEqual(reloaded.status, "DRAFT_CREATED")
 
         reopen_response = self.client.post(f"/reopen/{record.id}")
         self.assertEqual(reopen_response.status_code, 200)
         reloaded = QueueManager(storage_path=self.storage_path, max_size=20).get_failure(record.id)
         self.assertEqual(reloaded.status, "READY")
+
+    @patch("app.ui.dashboard.create_draft", create=True, return_value={"success": True, "draft_id": "draft-1"})
+    def test_approve_route_creates_outlook_draft_and_marks_queue(self, mock_create_draft):
+        queue_manager = QueueManager(storage_path=self.storage_path, max_size=20)
+        record = queue_manager.add_failure(
+            job_name="JOB1",
+            environment="PROD",
+            server="SERVER1",
+            subject="subject",
+            received_time="2026-07-05",
+            root_cause="missing permission",
+            email={"subject": "RCA - JOB1 Failure - PROD", "body": "Body"},
+        )
+        record.status = "READY"
+        queue_manager.save()
+
+        response = self.client.post(f"/approve/{record.id}")
+
+        self.assertEqual(response.status_code, 200)
+        mock_create_draft.assert_called_once()
+        reloaded = QueueManager(storage_path=self.storage_path, max_size=20).get_failure(record.id)
+        self.assertEqual(reloaded.status, "DRAFT_CREATED")
+        self.assertIn("Draft created successfully", response.get_data(as_text=True))
 
 
 if __name__ == "__main__":
