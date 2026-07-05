@@ -5,7 +5,7 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
-from app.outlook.sender import create_draft
+from app.outlook.sender import create_draft, send_mail
 from app.queue.queue_manager import QueueManager
 
 logger = logging.getLogger(__name__)
@@ -242,6 +242,16 @@ def _get_failure_for_action(failure_id: str | None, queue_manager: QueueManager 
     return next(iter(manager.list_failures()), None)
 
 
+def _persist_email_preview(record: Any, subject: str | None, body: str | None, queue_manager: QueueManager) -> None:
+    email_payload = dict(record.email or {})
+    email_payload["subject"] = subject or email_payload.get("subject") or ""
+    email_payload["body"] = body or email_payload.get("body") or ""
+    record.email = email_payload
+    record.last_updated = queue_manager._timestamp()
+    queue_manager.save()
+    logger.info("Updated email preview for failure %s", record.id)
+
+
 def _apply_decision(action: str, failure_id: str | None) -> dict[str, Any]:
     global _approval_state
 
@@ -399,6 +409,97 @@ def reject(failure_id: str | None = None) -> str:
 @app.post("/reopen/<failure_id>")
 def reopen(failure_id: str | None = None) -> str:
     return render_template("index.html", **_apply_decision("reopen", failure_id))
+
+
+@app.post("/preview")
+@app.post("/preview/<failure_id>")
+def preview(failure_id: str | None = None) -> str:
+    global _approval_state
+
+    queue_manager = QueueManager()
+    record = _get_failure_for_action(failure_id, queue_manager=queue_manager)
+    if record is None:
+        logger.warning("No failure selected for preview update")
+        _approval_state = {
+            "status": "Pending",
+            "message": "No Failure Events",
+            "is_finalized": True,
+            "is_approved": False,
+        }
+        return render_template("index.html", **_build_view_context(failure_id))
+
+    subject = request.form.get("subject")
+    body = request.form.get("body")
+    _persist_email_preview(record, subject, body, queue_manager)
+    logger.info("Saved preview edits for failure %s", record.id)
+    _approval_state = {
+        "status": "Draft Updated",
+        "message": "Preview updated successfully",
+        "is_finalized": True,
+        "is_approved": False,
+    }
+    return render_template("index.html", **_build_view_context(record.id))
+
+
+@app.post("/send")
+@app.post("/send/<failure_id>")
+def send(failure_id: str | None = None) -> str:
+    global _approval_state
+
+    queue_manager = QueueManager()
+    record = _get_failure_for_action(failure_id, queue_manager=queue_manager)
+    if record is None:
+        logger.warning("No failure selected for send action")
+        _approval_state = {
+            "status": "Pending",
+            "message": "No Failure Events",
+            "is_finalized": True,
+            "is_approved": False,
+        }
+        return render_template("index.html", **_build_view_context(failure_id))
+
+    subject = request.form.get("subject")
+    body = request.form.get("body")
+    _persist_email_preview(record, subject, body, queue_manager)
+
+    if record.status != "DRAFT_CREATED":
+        logger.warning("Invalid send transition for %s from %s", record.id, record.status)
+        _approval_state = {
+            "status": "Pending",
+            "message": "Invalid transition",
+            "is_finalized": True,
+            "is_approved": False,
+        }
+        return render_template("index.html", **_build_view_context(record.id))
+
+    email_payload = record.email or {}
+    send_result = send_mail(
+        to="",
+        cc="",
+        subject=email_payload.get("subject") or "",
+        body=email_payload.get("body") or "",
+    )
+    if not send_result.get("success"):
+        logger.error("Failed to send Outlook mail for %s: %s", record.id, send_result.get("error"))
+        _approval_state = {
+            "status": "Draft Created",
+            "message": "Send failed",
+            "is_finalized": True,
+            "is_approved": True,
+        }
+        return render_template("index.html", **_build_view_context(record.id))
+
+    record.status = "SENT"
+    record.last_updated = queue_manager._timestamp()
+    queue_manager.save()
+    logger.info("Sent failure %s via dashboard action", record.id)
+    _approval_state = {
+        "status": "Sent",
+        "message": "Email sent successfully",
+        "is_finalized": True,
+        "is_approved": True,
+    }
+    return render_template("index.html", **_build_view_context(record.id))
 
 
 if __name__ == "__main__":

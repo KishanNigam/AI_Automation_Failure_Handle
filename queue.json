@@ -19,13 +19,13 @@
     },
     "email": {
       "subject": "RCA - JOB1 Failure - PROD",
-      "body": "Dear Team,\n\nThe scheduled VisualCron job JOB1 failed in the PROD environment.\n\nRoot Cause\n-----------\nMissing permissions\n\nBusiness Impact\n---------------\nJob delayed\n\nTechnical Impact\n----------------\nBatch blocked\n\nRecommended Resolution\n----------------------\nFix permissions\n\nPlease let us know if any additional information is required.\n\nRegards,\n\nAI L1 Support Agent"
+      "body": "Dear Team,\r\n\r\nThe scheduled VisualCron job JOB1 failed in the PROD environment.\r\n\r\nRoot Cause\r\n-----------\r\nMissing permissions\r\n\r\nBusiness Impact\r\n---------------\r\nJob delayed\r\n\r\nTechnical Impact\r\n----------------\r\nBatch blocked\r\n\r\nRecommended Resolution\r\n----------------------\r\nFix permissions\r\n\r\nPlease let us know if any additional information is required.\r\n\r\nRegards,\r\n\r\nAI L1 Support Agent"
     },
     "visualcron_log": null,
     "batch_log": null,
     "vbs_log": null,
     "created_at": "2026-07-05T17:03:50.101306+00:00",
-    "last_updated": "2026-07-05T19:45:33.902771+00:00"
+    "last_updated": "2026-07-05T20:34:56.161000+00:00"
   },
   {
     "id": "c0b1b5ae74b5",
@@ -47,13 +47,13 @@
     },
     "email": {
       "subject": "RCA - BANK1_File_Import Failure - PROD",
-      "body": "Dear Team,\n\nThe scheduled VisualCron job BANK1_File_Import failed in the PROD environment.\n\nRoot Cause\n-----------\nNo error information provided in the logs.\n\nBusiness Impact\n---------------\nInsufficient information to determine business impact.\n\nTechnical Impact\n----------------\nInsufficient information to determine technical impact.\n\nRecommended Resolution\n----------------------\nReview the job configuration and ensure all required logs are enabled for detailed troubleshooting.\n\nPlease let us know if any additional information is required.\n\nRegards,\n\nAI L1 Support Agent"
+      "body": "Dear Rohit,\r\n\r\nThe scheduled VisualCron job BANK1_File_Import failed in the PROD environment.\r\n\r\nRoot Cause\r\n-----------\r\nNo error information provided in the logs.\r\n\r\nBusiness Impact\r\n---------------\r\nInsufficient information to determine business impact.\r\n\r\nTechnical Impact\r\n----------------\r\nInsufficient information to determine technical impact.\r\n\r\nRecommended Resolution\r\n----------------------\r\nReview the job configuration and ensure all required logs are enabled for detailed troubleshooting.\r\n\r\nPlease let us know if any additional information is required.\r\n\r\nRegards,\r\n\r\nAI L1 Support Agent"
     },
     "visualcron_log": null,
     "batch_log": null,
     "vbs_log": null,
     "created_at": "2026-07-05T19:04:31.986627+00:00",
-    "last_updated": "2026-07-05T19:51:39.821222+00:00"
+    "last_updated": "2026-07-05T20:33:37.904731+00:00"
   },
   {
     "id": "76b43a80cfad",

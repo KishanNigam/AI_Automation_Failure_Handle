@@ -88,6 +88,57 @@ class DashboardApprovalTests(unittest.TestCase):
         self.assertEqual(reloaded.status, "DRAFT_CREATED")
         self.assertIn("Draft created successfully", response.get_data(as_text=True))
 
+    def test_preview_save_updates_email_fields(self):
+        queue_manager = QueueManager(storage_path=self.storage_path, max_size=20)
+        record = queue_manager.add_failure(
+            job_name="JOB1",
+            environment="PROD",
+            server="SERVER1",
+            subject="subject",
+            received_time="2026-07-05",
+            root_cause="missing permission",
+            email={"subject": "RCA - JOB1 Failure - PROD", "body": "Body"},
+        )
+        record.status = "READY"
+        queue_manager.save()
+
+        response = self.client.post(
+            f"/preview/{record.id}",
+            data={"subject": "Updated Subject", "body": "Updated Body"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        reloaded = QueueManager(storage_path=self.storage_path, max_size=20).get_failure(record.id)
+        self.assertEqual(reloaded.email["subject"], "Updated Subject")
+        self.assertEqual(reloaded.email["body"], "Updated Body")
+        self.assertIn("Updated Subject", response.get_data(as_text=True))
+
+    @patch("app.ui.dashboard.send_mail", create=True, return_value={"success": True})
+    def test_send_route_marks_queue_as_sent(self, mock_send_mail):
+        queue_manager = QueueManager(storage_path=self.storage_path, max_size=20)
+        record = queue_manager.add_failure(
+            job_name="JOB1",
+            environment="PROD",
+            server="SERVER1",
+            subject="subject",
+            received_time="2026-07-05",
+            root_cause="missing permission",
+            email={"subject": "RCA - JOB1 Failure - PROD", "body": "Body"},
+        )
+        record.status = "DRAFT_CREATED"
+        queue_manager.save()
+
+        response = self.client.post(
+            f"/send/{record.id}",
+            data={"subject": "Updated Subject", "body": "Updated Body"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_send_mail.assert_called_once()
+        reloaded = QueueManager(storage_path=self.storage_path, max_size=20).get_failure(record.id)
+        self.assertEqual(reloaded.status, "SENT")
+        self.assertIn("Email sent successfully", response.get_data(as_text=True))
+
 
 if __name__ == "__main__":
     unittest.main()

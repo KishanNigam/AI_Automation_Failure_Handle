@@ -468,6 +468,39 @@
                     {% endif %}
                 </article>
 
+                <article class="card detail-card">
+                    <div class="detail-card-header">
+                        <div>
+                            <h2>Email Preview</h2>
+                            <p class="panel-caption">Review and edit the outgoing message</p>
+                        </div>
+                        <div class="detail-status-chip">{{ approval_status }}</div>
+                    </div>
+                    {% if empty_queue %}
+                    <div class="empty-state">No Failure Events</div>
+                    {% else %}
+                    <form class="preview-form" method="post" action="/preview/{{ selected_failure.id }}">
+                        <div class="field-stack">
+                            <div class="field-row compact"><span>To</span><strong>{{ selected_failure.email.subject }}</strong></div>
+                            <div class="field-row compact"><span>CC</span><strong>—</strong></div>
+                            <div class="field-row compact">
+                                <span>Subject</span>
+                                <input type="text" name="subject" value="{{ selected_failure.email.subject }}" />
+                            </div>
+                            <div class="field-row compact">
+                                <span>Body</span>
+                                <textarea name="body" rows="10">{{ selected_failure.email.body }}</textarea>
+                            </div>
+                        </div>
+                        <div class="button-group" style="margin-top: 12px;">
+                            <button class="button button-approve" type="submit">Save Changes</button>
+                            <button class="button button-refresh" type="submit" formaction="/approve/{{ selected_failure.id }}" {% if not selected_failure.approve_enabled %}disabled{% endif %}>Create Draft</button>
+                            <button class="button button-approve" type="submit" formaction="/send/{{ selected_failure.id }}" {% if selected_failure.status != 'DRAFT_CREATED' %}disabled{% endif %}>Send Mail</button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </article>
+
                 <article class="card detail-card action-card">
                     <div class="detail-card-header">
                         <div>

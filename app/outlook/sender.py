@@ -6,16 +6,22 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def create_draft(*, to: str | None = None, cc: str | None = None, subject: str | None = None, body: str | None = None) -> dict[str, Any]:
-    """Create an Outlook draft message without sending it."""
+def _get_outlook_application() -> Any:
     try:
         import win32com.client as win32
     except ImportError as exc:
-        logger.exception("pywin32 is required to create Outlook drafts")
-        return {"success": False, "error": "pywin32 is required to access Outlook via COM."}
+        raise RuntimeError("pywin32 is required to access Outlook via COM.") from exc
 
     try:
-        outlook = win32.Dispatch("Outlook.Application")
+        return win32.Dispatch("Outlook.Application")
+    except Exception as exc:
+        raise RuntimeError("Unable to connect to Microsoft Outlook.") from exc
+
+
+def create_draft(*, to: str | None = None, cc: str | None = None, subject: str | None = None, body: str | None = None) -> dict[str, Any]:
+    """Create an Outlook draft message without sending it."""
+    try:
+        outlook = _get_outlook_application()
         mail = outlook.CreateItem(0)
         mail.To = to or ""
         mail.CC = cc or ""
@@ -26,6 +32,23 @@ def create_draft(*, to: str | None = None, cc: str | None = None, subject: str |
         return {"success": True, "draft_id": getattr(mail, "EntryID", None)}
     except Exception as exc:
         logger.exception("Failed to create Outlook draft")
+        return {"success": False, "error": str(exc)}
+
+
+def send_mail(*, to: str | None = None, cc: str | None = None, subject: str | None = None, body: str | None = None) -> dict[str, Any]:
+    """Send an Outlook mail message immediately."""
+    try:
+        outlook = _get_outlook_application()
+        mail = outlook.CreateItem(0)
+        mail.To = to or ""
+        mail.CC = cc or ""
+        mail.Subject = subject or ""
+        mail.Body = body or ""
+        mail.Send()
+        logger.info("Sent Outlook mail for subject %s", subject)
+        return {"success": True, "message_id": getattr(mail, "EntryID", None)}
+    except Exception as exc:
+        logger.exception("Failed to send Outlook mail")
         return {"success": False, "error": str(exc)}
 
 
