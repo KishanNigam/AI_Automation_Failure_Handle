@@ -57,27 +57,40 @@ class WorkflowEngine:
 
             logger.info("Workflow step completed: retrieved latest failure email")
             raw_email = emails[0]
+            logger.info("Workflow step: Outlook email read")
 
             logger.info("Workflow started: parsing failure email")
             failure_event = parse_failure_email(raw_email)
             logger.info("Workflow step completed: parsed failure email")
+            logger.info("Workflow step: Email parsed")
 
             logger.info("Workflow started: collecting related logs")
             collected_logs = self.collector.collect(failure_event)
             logger.info("Workflow step completed: collected logs")
+            logger.info("Workflow step: Logs collected")
 
             logger.info("Workflow started: analyzing failure event")
+            logger.info("Workflow step: AI request started")
             analysis_result = self.analyzer.analyze(failure_event, collected_logs)
+            logger.info("Workflow step: AI response received")
             logger.info("Workflow step completed: analysis completed")
 
             client_email = self.email_generator.generate_email(failure_event, analysis_result)
-            self._persist_failure_record(
-                failure_event=failure_event,
-                analysis_result=analysis_result,
-                client_email=client_email,
-            )
+            logger.info("Workflow step: Client email generated")
+            logger.info("Workflow step: QueueManager persistence started")
+            try:
+                self._persist_failure_record(
+                    failure_event=failure_event,
+                    analysis_result=analysis_result,
+                    client_email=client_email,
+                )
+            except Exception as exc:
+                logger.exception("Workflow persistence failed: %s", exc)
+                raise
+            logger.info("Workflow step: QueueManager persistence completed")
             self._print_report(failure_event, analysis_result)
             logger.info("Workflow completed successfully")
+            logger.info("Workflow step: Workflow completed successfully")
             return WorkflowResult(
                 failure_event=failure_event,
                 analysis_result=analysis_result,

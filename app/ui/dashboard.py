@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from flask import Flask, render_template, request
+from flask import Flask, jsonify, render_template, request
 
 from app.queue.queue_manager import QueueManager
 
@@ -73,7 +73,7 @@ def _empty_failure_item() -> dict[str, Any]:
     }
 
 
-def _build_queue_items() -> list[dict[str, Any]]:
+def _build_queue_items(selected_failure_id: str | None = None, preserve_selection: bool = False) -> list[dict[str, Any]]:
     try:
         queue_manager = QueueManager()
         records = queue_manager.list_failures()
@@ -119,12 +119,19 @@ def _build_queue_items() -> list[dict[str, Any]]:
         )
 
     if queue_items:
-        queue_items[0]["selected"] = True
+        if preserve_selection and selected_failure_id:
+            selected_match = next((item for item in queue_items if item.get("id") == selected_failure_id), None)
+            if selected_match is not None:
+                selected_match["selected"] = True
+            else:
+                queue_items[0]["selected"] = True
+        else:
+            queue_items[0]["selected"] = True
     return queue_items
 
 
 def _build_view_context(selected_failure_id: str | None = None) -> dict[str, Any]:
-    queue_items = _build_queue_items()
+    queue_items = _build_queue_items(selected_failure_id=selected_failure_id, preserve_selection=True)
     empty_queue = not queue_items
 
     selected_failure = None
@@ -186,6 +193,42 @@ def _build_view_context(selected_failure_id: str | None = None) -> dict[str, Any
         "confirmation_message": _approval_state["message"] if _approval_state["is_finalized"] else "",
         "approval_finalized": _approval_state["is_finalized"],
         "status_message": status_message,
+        "selected_failure_id": selected_failure_id,
+    }
+
+
+def _build_api_context(selected_failure_id: str | None = None) -> dict[str, Any]:
+    queue_items = _build_queue_items(selected_failure_id=selected_failure_id, preserve_selection=True)
+    empty_queue = not queue_items
+
+    selected_failure = None
+    if not empty_queue:
+        selected_failure = next((item for item in queue_items if item.get("id") == selected_failure_id), None)
+        if selected_failure is None:
+            selected_failure = next((item for item in queue_items if item.get("selected")), queue_items[0])
+    if selected_failure is None:
+        selected_failure = _empty_failure_item()
+        selected_failure_id = None
+
+    pending_count = sum(1 for item in queue_items if item["status"] in {"NEW", "ANALYZING"})
+    ready_count = sum(1 for item in queue_items if item["status"] == "READY")
+    approved_count = sum(1 for item in queue_items if item["status"] == "APPROVED")
+    rejected_count = sum(1 for item in queue_items if item["status"] == "REJECTED")
+    sent_count = sum(1 for item in queue_items if item["status"] == "SENT")
+
+    return {
+        "queue_items": queue_items,
+        "selected_failure": selected_failure,
+        "empty_queue": empty_queue,
+        "stats": {
+            "pending": pending_count,
+            "ready": ready_count,
+            "approved": approved_count,
+            "rejected": rejected_count,
+            "sent": sent_count,
+            "queue_size": len(queue_items),
+            "queue_capacity": 20,
+        },
         "selected_failure_id": selected_failure_id,
     }
 
@@ -309,6 +352,13 @@ def _apply_decision(action: str, failure_id: str | None) -> dict[str, Any]:
 def index() -> str:
     context = _build_view_context(request.args.get("failure_id"))
     return render_template("index.html", **context)
+
+
+@app.get("/api/queue")
+def api_queue() -> Any:
+    selected_failure_id = request.args.get("selected_id")
+    logger.info("Serving queue API refresh for selected failure %s", selected_failure_id)
+    return jsonify(_build_api_context(selected_failure_id=selected_failure_id))
 
 
 @app.post("/approve")

@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from datetime import datetime, timezone
 
 from app.queue.models import FailureRecord
 from app.queue.queue_manager import QueueManager
@@ -53,6 +54,25 @@ class QueueManagerTests(unittest.TestCase):
         self.manager.approve(record.id)
         reloaded = QueueManager(storage_path=self.storage_path, max_size=3)
         self.assertEqual(reloaded.get_failure(record.id).status, "APPROVED")
+
+    def test_datetime_received_time_persists_and_round_trips(self):
+        received_time = datetime(2026, 7, 6, 12, 0, tzinfo=timezone.utc)
+        record = self.manager.add_failure(
+            job_name="JOB1",
+            environment="PROD",
+            server="SERVER1",
+            subject="subject",
+            received_time=received_time,
+            root_cause="missing permission",
+        )
+
+        self.assertEqual(record.received_time, received_time)
+
+        reloaded = QueueManager(storage_path=self.storage_path, max_size=3)
+        reloaded_record = reloaded.get_failure(record.id)
+        self.assertIsNotNone(reloaded_record)
+        self.assertIsInstance(reloaded_record.received_time, datetime)
+        self.assertEqual(reloaded_record.received_time, received_time)
 
 
 if __name__ == "__main__":

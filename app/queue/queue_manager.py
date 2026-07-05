@@ -166,6 +166,17 @@ class QueueManager:
 
     @staticmethod
     def _deserialize(payload: dict[str, Any]) -> FailureRecord:
+        received_time = payload.get("received_time")
+        created_at = payload.get("created_at")
+        last_updated = payload.get("last_updated")
+
+        if not isinstance(received_time, (str, datetime)):
+            received_time = str(received_time)
+        if not isinstance(created_at, (str, datetime)):
+            created_at = str(created_at)
+        if not isinstance(last_updated, (str, datetime)):
+            last_updated = str(last_updated)
+
         return FailureRecord(
             id=str(payload["id"]),
             fingerprint=str(payload["fingerprint"]),
@@ -173,7 +184,7 @@ class QueueManager:
             environment=str(payload.get("environment", "")),
             server=str(payload.get("server", "")),
             subject=str(payload.get("subject", "")),
-            received_time=str(payload.get("received_time", "")),
+            received_time=received_time,
             status=str(payload.get("status", "NEW")),
             occurrence_count=int(payload.get("occurrence_count", 1)),
             analysis=payload.get("analysis"),
@@ -181,6 +192,6 @@ class QueueManager:
             visualcron_log=payload.get("visualcron_log"),
             batch_log=payload.get("batch_log"),
             vbs_log=payload.get("vbs_log"),
-            created_at=str(payload.get("created_at", "")),
-            last_updated=str(payload.get("last_updated", "")),
+            created_at=created_at,
+            last_updated=last_updated,
         )

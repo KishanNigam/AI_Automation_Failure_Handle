@@ -6,9 +6,9 @@
     "environment": "PROD",
     "server": "SERVER1",
     "subject": "[EXTERNAL] EAS-P5-MW - JOB1 - PROD - SERVER1",
-    "received_time": "2026-07-04 00:00:00",
+    "received_time": "2026-07-04T00:00:00",
     "status": "READY",
-    "occurrence_count": 6,
+    "occurrence_count": 7,
     "analysis": {
       "failure_stage": "Execution",
       "root_cause": "Missing permissions",
@@ -25,6 +25,118 @@
     "batch_log": null,
     "vbs_log": null,
     "created_at": "2026-07-05T17:03:50.101306+00:00",
-    "last_updated": "2026-07-05T17:24:42.026853+00:00"
+    "last_updated": "2026-07-05T19:45:33.902771+00:00"
+  },
+  {
+    "id": "c0b1b5ae74b5",
+    "fingerprint": "c0b1b5ae74b5c197e0623344bcdd21085011fe45c4923eabfda6ff3118d50ef8",
+    "job_name": "BANK1_File_Import",
+    "environment": "PROD",
+    "server": "BHSIEAS32",
+    "subject": "[EXTERNAL] EAS-P5-MW - BANK1_File_Import - PROD - BHSIEAS32",
+    "received_time": "2026-07-06T00:27:05+00:00",
+    "status": "APPROVED",
+    "occurrence_count": 3,
+    "analysis": {
+      "failure_stage": "Job Execution",
+      "root_cause": "No error information provided in the logs.",
+      "business_impact": "Insufficient information to determine business impact.",
+      "technical_impact": "Insufficient information to determine technical impact.",
+      "recommended_resolution": "Review the job configuration and ensure all required logs are enabled for detailed troubleshooting.",
+      "confidence_score": 0
+    },
+    "email": {
+      "subject": "RCA - BANK1_File_Import Failure - PROD",
+      "body": "Dear Team,\n\nThe scheduled VisualCron job BANK1_File_Import failed in the PROD environment.\n\nRoot Cause\n-----------\nNo error information provided in the logs.\n\nBusiness Impact\n---------------\nInsufficient information to determine business impact.\n\nTechnical Impact\n----------------\nInsufficient information to determine technical impact.\n\nRecommended Resolution\n----------------------\nReview the job configuration and ensure all required logs are enabled for detailed troubleshooting.\n\nPlease let us know if any additional information is required.\n\nRegards,\n\nAI L1 Support Agent"
+    },
+    "visualcron_log": null,
+    "batch_log": null,
+    "vbs_log": null,
+    "created_at": "2026-07-05T19:04:31.986627+00:00",
+    "last_updated": "2026-07-05T19:51:39.821222+00:00"
+  },
+  {
+    "id": "76b43a80cfad",
+    "fingerprint": "76b43a80cfadde7c1b583deb2f29448d14d4647df72a948897f9eb0257455a00",
+    "job_name": "BAI2_File_Import",
+    "environment": "PROD",
+    "server": "BHSIEAS32",
+    "subject": "[EXTERNAL] EAS-P5-MW - BAI2_File_Import - PROD - BHSIEAS32",
+    "received_time": "2026-07-06T00:40:22+00:00",
+    "status": "REJECTED",
+    "occurrence_count": 2,
+    "analysis": {
+      "failure_stage": "VB Script Execution",
+      "root_cause": "Input file not found. Path: \\\\SFTPServer\\Inbound\\BAI2\\BAI2_20260703.txt",
+      "business_impact": "The file import process failed, preventing data from being processed and potentially causing delays in business operations.",
+      "technical_impact": "The VB Script failed to locate the required input file, resulting in an immediate termination of the batch process and subsequent job failure.",
+      "recommended_resolution": "Verify the file path and ensure the file is available at the specified location. Check the SFTP server connectivity and file transfer process to confirm the file was successfully uploaded.",
+      "confidence_score": 100
+    },
+    "email": {
+      "subject": "RCA - BAI2_File_Import Failure - PROD",
+      "body": "Dear Team,\n\nThe scheduled VisualCron job BAI2_File_Import failed in the PROD environment.\n\nRoot Cause\n-----------\nInput file not found. Path: \\\\SFTPServer\\Inbound\\BAI2\\BAI2_20260703.txt\n\nBusiness Impact\n---------------\nThe file import process failed, preventing data from being processed and potentially causing delays in business operations.\n\nTechnical Impact\n----------------\nThe VB Script failed to locate the required input file, resulting in an immediate termination of the batch process and subsequent job failure.\n\nRecommended Resolution\n----------------------\nVerify the file path and ensure the file is available at the specified location. Check the SFTP server connectivity and file transfer process to confirm the file was successfully uploaded.\n\nPlease let us know if any additional information is required.\n\nRegards,\n\nAI L1 Support Agent"
+    },
+    "visualcron_log": null,
+    "batch_log": null,
+    "vbs_log": null,
+    "created_at": "2026-07-05T19:11:43.698596+00:00",
+    "last_updated": "2026-07-05T19:53:42.769161+00:00"
+  },
+  {
+    "id": "57a5c18fff5b",
+    "fingerprint": "57a5c18fff5bbad599c266e1ded5f346e096a97ad154e6c58d22ca8b64c2b5ee",
+    "job_name": "BAI5_File_Import",
+    "environment": "PROD",
+    "server": "BHSIEAS32",
+    "subject": "[EXTERNAL] EAS-P5-MW - BAI5_File_Import - PROD - BHSIEAS32",
+    "received_time": "2026-07-06T00:49:35+00:00",
+    "status": "READY",
+    "occurrence_count": 1,
+    "analysis": {
+      "failure_stage": "Job Execution",
+      "root_cause": "No error information provided in the logs.",
+      "business_impact": "Insufficient information to determine business impact.",
+      "technical_impact": "Insufficient information to determine technical impact.",
+      "recommended_resolution": "Review the job configuration and ensure all required logs are enabled for detailed troubleshooting.",
+      "confidence_score": 0
+    },
+    "email": {
+      "subject": "RCA - BAI5_File_Import Failure - PROD",
+      "body": "Dear Team,\n\nThe scheduled VisualCron job BAI5_File_Import failed in the PROD environment.\n\nRoot Cause\n-----------\nNo error information provided in the logs.\n\nBusiness Impact\n---------------\nInsufficient information to determine business impact.\n\nTechnical Impact\n----------------\nInsufficient information to determine technical impact.\n\nRecommended Resolution\n----------------------\nReview the job configuration and ensure all required logs are enabled for detailed troubleshooting.\n\nPlease let us know if any additional information is required.\n\nRegards,\n\nAI L1 Support Agent"
+    },
+    "visualcron_log": null,
+    "batch_log": null,
+    "vbs_log": null,
+    "created_at": "2026-07-05T19:21:37.220625+00:00",
+    "last_updated": "2026-07-05T19:44:38.536094+00:00"
+  },
+  {
+    "id": "67824b86e1ef",
+    "fingerprint": "67824b86e1ef24d0a8dec3d8e702857bbeae095a70038e566c72291a954d1411",
+    "job_name": "BAI6_File_Import",
+    "environment": "PROD",
+    "server": "BHSIEAS32",
+    "subject": "[EXTERNAL] EAS-P5-MW - BAI6_File_Import - PROD - BHSIEAS32",
+    "received_time": "2026-07-06T01:02:31+00:00",
+    "status": "READY",
+    "occurrence_count": 1,
+    "analysis": {
+      "failure_stage": "Job Execution",
+      "root_cause": "No error information provided in the logs.",
+      "business_impact": "Insufficient information to determine business impact.",
+      "technical_impact": "Insufficient information to determine technical impact.",
+      "recommended_resolution": "Review the job configuration and ensure all required logs are enabled for detailed troubleshooting.",
+      "confidence_score": 0
+    },
+    "email": {
+      "subject": "RCA - BAI6_File_Import Failure - PROD",
+      "body": "Dear Team,\n\nThe scheduled VisualCron job BAI6_File_Import failed in the PROD environment.\n\nRoot Cause\n-----------\nNo error information provided in the logs.\n\nBusiness Impact\n---------------\nInsufficient information to determine business impact.\n\nTechnical Impact\n----------------\nInsufficient information to determine technical impact.\n\nRecommended Resolution\n----------------------\nReview the job configuration and ensure all required logs are enabled for detailed troubleshooting.\n\nPlease let us know if any additional information is required.\n\nRegards,\n\nAI L1 Support Agent"
+    },
+    "visualcron_log": null,
+    "batch_log": null,
+    "vbs_log": null,
+    "created_at": "2026-07-05T19:34:17.198190+00:00",
+    "last_updated": "2026-07-05T19:44:32.610270+00:00"
   }
 ]

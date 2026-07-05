@@ -41,7 +41,9 @@
             updateClocks();
             setInterval(updateClocks, 1000);
 
-            const queueItems = Array.from(document.querySelectorAll('.queue-item'));
+            const queueList = document.querySelector('.queue-list');
+            const statsEls = Array.from(document.querySelectorAll('.stat-pill strong'));
+            const queueSummary = document.querySelector('.queue-summary-pill');
             const selectedJob = document.getElementById('selected-job');
             const selectedMeta = document.getElementById('selected-meta');
             const selectedStatus = document.getElementById('selected-status');
@@ -55,8 +57,25 @@
             const analysisResolution = document.getElementById('analysis-resolution');
             const analysisConfidence = document.getElementById('analysis-confidence');
             const actionFeedback = document.getElementById('action-feedback');
+            let selectedFailureId = '';
+            let lastQueueSignature = '';
 
             const updateDetail = (item) => {
+                if (!item) {
+                    selectedJob.textContent = 'No failure selected';
+                    selectedMeta.textContent = '';
+                    selectedStatus.textContent = '—';
+                    selectedSubject.textContent = 'Subject: —';
+                    selectedBody.textContent = 'No failure details available.';
+                    selectedWorkflowStatus.textContent = '—';
+                    analysisStage.textContent = '—';
+                    analysisRootCause.textContent = '—';
+                    analysisBusinessImpact.textContent = '—';
+                    analysisTechnicalImpact.textContent = '—';
+                    analysisResolution.textContent = '—';
+                    analysisConfidence.textContent = '0 / 100';
+                    return;
+                }
                 selectedJob.textContent = item.dataset.jobName;
                 selectedMeta.textContent = `${item.dataset.environment} • ${item.dataset.server}`;
                 selectedStatus.textContent = item.dataset.status;
@@ -71,20 +90,229 @@
                 analysisConfidence.textContent = `${item.dataset.confidenceScore} / 100`;
             };
 
-            queueItems.forEach((item) => {
-                item.addEventListener('click', () => {
-                    queueItems.forEach((entry) => entry.classList.remove('selected'));
-                    item.classList.add('selected');
-                    updateDetail(item);
-                    actionFeedback.textContent = `Viewing ${item.dataset.jobName}`;
+            const getQueueSignature = (items) => JSON.stringify(items.map((item) => ({
+                id: item.id,
+                job_name: item.job_name,
+                environment: item.environment,
+                server: item.server,
+                status: item.status,
+                workflow_status: item.workflow_status,
+                occurrence_count: item.occurrence_count,
+                duplicate: item.duplicate,
+                subject: item.email.subject,
+                body: item.email.body,
+                stage: item.analysis.failure_stage,
+                root_cause: item.analysis.root_cause,
+                business_impact: item.analysis.business_impact,
+                technical_impact: item.analysis.technical_impact,
+                recommended_resolution: item.analysis.recommended_resolution,
+                confidence_score: item.analysis.confidence_score,
+            })));
+
+            const getQueueItems = () => Array.from(document.querySelectorAll('.queue-item'));
+
+            const updateActionForms = () => {
+                document.querySelectorAll('.action-form').forEach((form) => {
+                    const action = form.dataset.action;
+                    if (!action || !selectedFailureId) {
+                        return;
+                    }
+                    form.action = `/${action}/${encodeURIComponent(selectedFailureId)}`;
                 });
-            });
+            };
+
+            const syncSelectionToUrl = () => {
+                const url = new URL(window.location.href);
+                if (selectedFailureId) {
+                    url.searchParams.set('failure', selectedFailureId);
+                } else {
+                    url.searchParams.delete('failure');
+                }
+                window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+            };
+
+            const selectQueueItem = (item) => {
+                if (!item) {
+                    return;
+                }
+                const queueItems = getQueueItems();
+                queueItems.forEach((entry) => entry.classList.remove('selected'));
+                item.classList.add('selected');
+                selectedFailureId = item.dataset.id || '';
+                updateActionForms();
+                syncSelectionToUrl();
+                updateDetail(item);
+                actionFeedback.textContent = `Viewing ${item.dataset.jobName}`;
+            };
+
+            const getSelectedQueueItem = () => {
+                const queueItems = getQueueItems();
+                if (selectedFailureId) {
+                    return queueItems.find((item) => item.dataset.id === selectedFailureId) || null;
+                }
+                return queueItems.find((item) => item.classList.contains('selected')) || null;
+            };
+
+            if (queueList) {
+                queueList.addEventListener('click', (event) => {
+                    const item = event.target.closest('.queue-item');
+                    if (item) {
+                        selectQueueItem(item);
+                    }
+                });
+            }
 
             document.querySelectorAll('.action-button').forEach((button) => {
                 button.addEventListener('click', () => {
+                    const form = button.closest('form');
+                    if (form && selectedFailureId) {
+                        form.action = `/${form.dataset.action}/${encodeURIComponent(selectedFailureId)}`;
+                    }
+                    updateActionForms();
                     actionFeedback.textContent = `${button.dataset.action} selected for ${selectedJob.textContent}`;
                 });
             });
+
+            const initialSelectionId = (() => {
+                const params = new URLSearchParams(window.location.search);
+                const requestedFailureId = params.get('failure');
+                if (requestedFailureId) {
+                    const matchingItem = getQueueItems().find((item) => item.dataset.id === requestedFailureId);
+                    if (matchingItem) {
+                        return requestedFailureId;
+                    }
+                }
+
+                const initialSelection = document.querySelector('.queue-item.selected');
+                if (initialSelection?.dataset.id) {
+                    return initialSelection.dataset.id;
+                }
+
+                const firstQueueItem = getQueueItems()[0];
+                return firstQueueItem?.dataset.id || '';
+            })();
+
+            if (initialSelectionId) {
+                const initialQueueItem = getQueueItems().find((item) => item.dataset.id === initialSelectionId);
+                if (initialQueueItem) {
+                    selectQueueItem(initialQueueItem);
+                }
+            } else {
+                updateDetail(null);
+            }
+
+            const refreshQueue = () => {
+                const url = `/api/queue${selectedFailureId ? `?selected_id=${encodeURIComponent(selectedFailureId)}` : ''}`;
+                console.log('Polling queue refresh', url);
+                fetch(url)
+                    .then((response) => response.json())
+                    .then((payload) => {
+                        const queueItems = payload.queue_items || [];
+                        if (!queueList) {
+                            return;
+                        }
+
+                        const queueSignature = getQueueSignature(queueItems);
+                        if (queueSignature === lastQueueSignature) {
+                            if (queueSummary) {
+                                queueSummary.textContent = `Queue ${payload.stats.queue_size} / ${payload.stats.queue_capacity}`;
+                            }
+                            if (statsEls.length >= 5) {
+                                statsEls[0].textContent = payload.stats.pending;
+                                statsEls[1].textContent = payload.stats.ready;
+                                statsEls[2].textContent = payload.stats.approved;
+                                statsEls[3].textContent = payload.stats.rejected;
+                                statsEls[4].textContent = payload.stats.sent;
+                            }
+                            return;
+                        }
+
+                        lastQueueSignature = queueSignature;
+                        const scrollTop = queueList.scrollTop;
+                        queueList.innerHTML = '';
+                        if (!queueItems.length) {
+                            queueList.innerHTML = '<div class="empty-state">No Failure Events</div>';
+                            selectedFailureId = '';
+                            updateActionForms();
+                            syncSelectionToUrl();
+                            updateDetail(null);
+                        } else {
+                            let nextSelectionId = '';
+                            const existingSelection = queueItems.find((item) => item.id === selectedFailureId);
+                            if (existingSelection) {
+                                nextSelectionId = existingSelection.id;
+                            } else if (selectedFailureId) {
+                                nextSelectionId = queueItems[0].id;
+                            } else {
+                                nextSelectionId = queueItems[0].id;
+                            }
+
+                            queueItems.forEach((item) => {
+                                const button = document.createElement('button');
+                                button.className = 'queue-item';
+                                button.type = 'button';
+                                button.dataset.id = item.id;
+                                button.dataset.jobName = item.job_name;
+                                button.dataset.environment = item.environment;
+                                button.dataset.server = item.server;
+                                button.dataset.status = item.status;
+                                button.dataset.workflowStatus = item.workflow_status;
+                                button.dataset.subject = item.email.subject;
+                                button.dataset.body = item.email.body;
+                                button.dataset.stage = item.analysis.failure_stage;
+                                button.dataset.rootCause = item.analysis.root_cause;
+                                button.dataset.businessImpact = item.analysis.business_impact;
+                                button.dataset.technicalImpact = item.analysis.technical_impact;
+                                button.dataset.recommendedResolution = item.analysis.recommended_resolution;
+                                button.dataset.confidenceScore = item.analysis.confidence_score;
+                                if (item.id === nextSelectionId) {
+                                    button.classList.add('selected');
+                                    selectedFailureId = item.id;
+                                }
+                                button.innerHTML = `
+                                    <div class="queue-item-top">
+                                        <span class="queue-icon">${item.icon}</span>
+                                        <div class="queue-item-title">
+                                            <strong>${item.job_name}</strong>
+                                            <span>${item.environment} • ${item.server}</span>
+                                        </div>
+                                    </div>
+                                    <div class="queue-item-meta">
+                                        <span>${item.received_time}</span>
+                                        <span class="queue-status">${item.status}</span>
+                                    </div>
+                                    ${item.duplicate ? `<div class="duplicate-badge">Duplicate ×${item.occurrence_count}</div>` : `<div class="occurrence-count">Occurrence ${item.occurrence_count}</div>`}
+                                `;
+                                queueList.appendChild(button);
+                            });
+
+                            updateActionForms();
+                            syncSelectionToUrl();
+                            const selectedItem = getSelectedQueueItem();
+                            if (selectedItem) {
+                                updateDetail(selectedItem);
+                                actionFeedback.textContent = `Viewing ${selectedItem.dataset.jobName}`;
+                            } else {
+                                updateDetail(null);
+                            }
+                        }
+                        queueList.scrollTop = scrollTop;
+                        if (queueSummary) {
+                            queueSummary.textContent = `Queue ${payload.stats.queue_size} / ${payload.stats.queue_capacity}`;
+                        }
+                        if (statsEls.length >= 5) {
+                            statsEls[0].textContent = payload.stats.pending;
+                            statsEls[1].textContent = payload.stats.ready;
+                            statsEls[2].textContent = payload.stats.approved;
+                            statsEls[3].textContent = payload.stats.rejected;
+                            statsEls[4].textContent = payload.stats.sent;
+                        }
+                    })
+                    .catch((error) => console.log('Queue refresh failed', error));
+            };
+
+            refreshQueue();
+            setInterval(refreshQueue, 5000);
         });
     </script>
 </head>
@@ -162,6 +390,7 @@
                     <button
                         class="queue-item{% if item.selected %} selected{% endif %}"
                         type="button"
+                        data-id="{{ item.id }}"
                         data-job-name="{{ item.job_name }}"
                         data-environment="{{ item.environment }}"
                         data-server="{{ item.server }}"
@@ -253,13 +482,13 @@
                         <button class="button button-reject action-button" type="button" data-action="Reject" disabled>Reject</button>
                         <button class="button button-refresh action-button" type="button" data-action="Reopen" disabled>Reopen</button>
                         {% else %}
-                        <form method="post" action="/approve/{{ selected_failure.id }}">
+                        <form class="action-form" data-action="approve" method="post" action="/approve/">
                             <button class="button button-approve action-button" type="submit" {% if not selected_failure.approve_enabled %}disabled{% endif %}>Approve</button>
                         </form>
-                        <form method="post" action="/reject/{{ selected_failure.id }}">
+                        <form class="action-form" data-action="reject" method="post" action="/reject/">
                             <button class="button button-reject action-button" type="submit" {% if not selected_failure.reject_enabled %}disabled{% endif %}>Reject</button>
                         </form>
-                        <form method="post" action="/reopen/{{ selected_failure.id }}">
+                        <form class="action-form" data-action="reopen" method="post" action="/reopen/">
                             <button class="button button-refresh action-button" type="submit" {% if not selected_failure.reopen_enabled %}disabled{% endif %}>Reopen</button>
                         </form>
                         {% endif %}
