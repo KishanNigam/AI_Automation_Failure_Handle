@@ -393,6 +393,16 @@ h2 {
     font-size: 0.92rem;
 }
 
+.empty-state {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    color: #475569;
+    text-align: center;
+    font-weight: 700;
+}
+
 .workflow-card {
     display: flex;
     flex-direction: column;

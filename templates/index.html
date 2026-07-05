@@ -47,6 +47,7 @@
             const selectedStatus = document.getElementById('selected-status');
             const selectedSubject = document.getElementById('selected-subject');
             const selectedBody = document.getElementById('selected-body');
+            const selectedWorkflowStatus = document.getElementById('selected-workflow-status');
             const analysisStage = document.getElementById('analysis-stage');
             const analysisRootCause = document.getElementById('analysis-root-cause');
             const analysisBusinessImpact = document.getElementById('analysis-business-impact');
@@ -61,6 +62,7 @@
                 selectedStatus.textContent = item.dataset.status;
                 selectedSubject.textContent = `Subject: ${item.dataset.subject}`;
                 selectedBody.textContent = item.dataset.body;
+                selectedWorkflowStatus.textContent = item.dataset.workflowStatus;
                 analysisStage.textContent = item.dataset.stage;
                 analysisRootCause.textContent = item.dataset.rootCause;
                 analysisBusinessImpact.textContent = item.dataset.businessImpact;
@@ -146,9 +148,16 @@
                         <span>Rejected</span>
                         <strong>{{ stats.rejected }}</strong>
                     </div>
+                    <div class="stat-pill">
+                        <span>Sent</span>
+                        <strong>{{ stats.sent }}</strong>
+                    </div>
                 </div>
 
                 <div class="queue-list">
+                    {% if empty_queue %}
+                    <div class="empty-state">No Failure Events</div>
+                    {% else %}
                     {% for item in queue_items %}
                     <button
                         class="queue-item{% if item.selected %} selected{% endif %}"
@@ -157,6 +166,7 @@
                         data-environment="{{ item.environment }}"
                         data-server="{{ item.server }}"
                         data-status="{{ item.status }}"
+                        data-workflow-status="{{ item.workflow_status }}"
                         data-subject="{{ item.email.subject }}"
                         data-body="{{ item.email.body }}"
                         data-stage="{{ item.analysis.failure_stage }}"
@@ -184,6 +194,7 @@
                         {% endif %}
                     </button>
                     {% endfor %}
+                    {% endif %}
                 </div>
             </aside>
 
@@ -200,6 +211,9 @@
                         <h3 id="selected-job">{{ selected_failure.job_name }}</h3>
                         <p class="detail-caption">Operational review for the selected failure queue item.</p>
                     </div>
+                    {% if empty_queue %}
+                    <div class="empty-state">No Failure Events</div>
+                    {% else %}
                     <div class="field-stack">
                         <div class="field-row compact"><span>Failure Stage</span><strong id="analysis-stage">{{ selected_failure.analysis.failure_stage }}</strong></div>
                         <div class="field-row compact"><span>Root Cause</span><strong id="analysis-root-cause">{{ selected_failure.analysis.root_cause }}</strong></div>
@@ -207,16 +221,22 @@
                         <div class="field-row compact"><span>Technical Impact</span><strong id="analysis-technical-impact">{{ selected_failure.analysis.technical_impact }}</strong></div>
                         <div class="field-row compact"><span>Recommended Resolution</span><strong id="analysis-resolution">{{ selected_failure.analysis.recommended_resolution }}</strong></div>
                         <div class="field-row compact"><span>Confidence Score</span><strong id="analysis-confidence">{{ selected_failure.analysis.confidence_score }} / 100</strong></div>
+                        <div class="field-row compact"><span>Workflow Status</span><strong id="selected-workflow-status">{{ selected_failure.workflow_status }}</strong></div>
                     </div>
+                    {% endif %}
                 </article>
 
                 <article class="card detail-card">
                     <h2>Client Email</h2>
+                    {% if empty_queue %}
+                    <div class="empty-state">No Failure Events</div>
+                    {% else %}
                     <div class="email-subject" id="selected-subject">Subject: {{ selected_failure.email.subject }}</div>
                     <div class="email-divider"></div>
                     <div class="email-body">
                         <p id="selected-body">{{ selected_failure.email.body }}</p>
                     </div>
+                    {% endif %}
                 </article>
 
                 <article class="card detail-card action-card">
@@ -228,9 +248,21 @@
                         <div class="detail-status-chip">{{ approval_status }}</div>
                     </div>
                     <div class="button-group">
-                        <button class="button button-approve action-button" type="button" data-action="Approve">Approve</button>
-                        <button class="button button-reject action-button" type="button" data-action="Reject">Reject</button>
-                        <button class="button button-refresh action-button" type="button" data-action="Reset">Reset</button>
+                        {% if empty_queue %}
+                        <button class="button button-approve action-button" type="button" data-action="Approve" disabled>Approve</button>
+                        <button class="button button-reject action-button" type="button" data-action="Reject" disabled>Reject</button>
+                        <button class="button button-refresh action-button" type="button" data-action="Reopen" disabled>Reopen</button>
+                        {% else %}
+                        <form method="post" action="/approve/{{ selected_failure.id }}">
+                            <button class="button button-approve action-button" type="submit" {% if not selected_failure.approve_enabled %}disabled{% endif %}>Approve</button>
+                        </form>
+                        <form method="post" action="/reject/{{ selected_failure.id }}">
+                            <button class="button button-reject action-button" type="submit" {% if not selected_failure.reject_enabled %}disabled{% endif %}>Reject</button>
+                        </form>
+                        <form method="post" action="/reopen/{{ selected_failure.id }}">
+                            <button class="button button-refresh action-button" type="submit" {% if not selected_failure.reopen_enabled %}disabled{% endif %}>Reopen</button>
+                        </form>
+                        {% endif %}
                         <button class="button button-logs action-button" type="button" data-action="View Logs">View Logs</button>
                         <button class="button button-refresh action-button" type="button" data-action="Refresh Queue">Refresh Queue</button>
                     </div>

@@ -8,6 +8,8 @@ from app.email.email_generator import ClientEmail, ClientEmailGenerator
 from app.logs.log_collector import LogCollector
 from app.outlook.parser import FailureEvent, parse_failure_email
 from app.outlook.reader import get_failure_emails
+from app.queue.models import FailureRecord
+from app.queue.queue_manager import QueueManager
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +33,12 @@ class WorkflowEngine:
         analyzer: LogAnalyzer | None = None,
         collector: LogCollector | None = None,
         email_generator: ClientEmailGenerator | None = None,
+        queue_manager: QueueManager | None = None,
     ) -> None:
         self.analyzer = analyzer or LogAnalyzer()
         self.collector = collector or LogCollector()
         self.email_generator = email_generator or ClientEmailGenerator()
+        self.queue_manager = queue_manager or QueueManager()
 
     def run(self) -> WorkflowResult:
         """Execute the workflow and return a structured workflow result."""
@@ -67,6 +71,11 @@ class WorkflowEngine:
             logger.info("Workflow step completed: analysis completed")
 
             client_email = self.email_generator.generate_email(failure_event, analysis_result)
+            self._persist_failure_record(
+                failure_event=failure_event,
+                analysis_result=analysis_result,
+                client_email=client_email,
+            )
             self._print_report(failure_event, analysis_result)
             logger.info("Workflow completed successfully")
             return WorkflowResult(
@@ -85,6 +94,50 @@ class WorkflowEngine:
                 workflow_status="failed",
                 error_message=f"{stage}: {exc}",
             )
+
+    def _persist_failure_record(
+        self,
+        *,
+        failure_event: FailureEvent,
+        analysis_result: AnalysisResult,
+        client_email: ClientEmail,
+    ) -> None:
+        analysis_payload = {
+            "failure_stage": analysis_result.failure_stage,
+            "root_cause": analysis_result.root_cause,
+            "business_impact": analysis_result.business_impact,
+            "technical_impact": analysis_result.technical_impact,
+            "recommended_resolution": analysis_result.recommended_resolution,
+            "confidence_score": analysis_result.confidence_score,
+        }
+        email_payload = {
+            "subject": client_email.subject,
+            "body": client_email.body,
+        }
+        self.queue_manager.add_failure(
+            job_name=failure_event.job_name,
+            environment=failure_event.environment,
+            server=failure_event.server_name,
+            subject=failure_event.subject,
+            received_time=failure_event.received_time,
+            root_cause=analysis_result.root_cause,
+            analysis=analysis_payload,
+            email=email_payload,
+        )
+        record = self.queue_manager.get_by_fingerprint(
+            FailureRecord.create(
+                job_name=failure_event.job_name,
+                environment=failure_event.environment,
+                server=failure_event.server_name,
+                subject=failure_event.subject,
+                received_time=failure_event.received_time,
+                root_cause=analysis_result.root_cause,
+            ).fingerprint
+        )
+        if record is not None:
+            record.status = "READY"
+            self.queue_manager.save()
+        logger.info("Stored completed failure record for %s in queue manager", failure_event.job_name)
 
     @staticmethod
     def _identify_stage(exc: Exception) -> str:

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "dd71d3ad413d",
+    "fingerprint": "dd71d3ad413d8f61a529dcfc6f6f90b9eccfa6cec4ce18448293a304694f1a52",
+    "job_name": "JOB1",
+    "environment": "PROD",
+    "server": "SERVER1",
+    "subject": "[EXTERNAL] EAS-P5-MW - JOB1 - PROD - SERVER1",
+    "received_time": "2026-07-04 00:00:00",
+    "status": "READY",
+    "occurrence_count": 6,
+    "analysis": {
+      "failure_stage": "Execution",
+      "root_cause": "Missing permissions",
+      "business_impact": "Job delayed",
+      "technical_impact": "Batch blocked",
+      "recommended_resolution": "Fix permissions",
+      "confidence_score": 88
+    },
+    "email": {
+      "subject": "RCA - JOB1 Failure - PROD",
+      "body": "Dear Team,\n\nThe scheduled VisualCron job JOB1 failed in the PROD environment.\n\nRoot Cause\n-----------\nMissing permissions\n\nBusiness Impact\n---------------\nJob delayed\n\nTechnical Impact\n----------------\nBatch blocked\n\nRecommended Resolution\n----------------------\nFix permissions\n\nPlease let us know if any additional information is required.\n\nRegards,\n\nAI L1 Support Agent"
+    },
+    "visualcron_log": null,
+    "batch_log": null,
+    "vbs_log": null,
+    "created_at": "2026-07-05T17:03:50.101306+00:00",
+    "last_updated": "2026-07-05T17:24:42.026853+00:00"
+  }
+]

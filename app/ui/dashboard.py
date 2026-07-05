@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 from app.queue.queue_manager import QueueManager
 
@@ -45,55 +45,32 @@ def _status_label(status: str) -> str:
     return status.replace("_", " ").title()
 
 
-def _fallback_queue_items() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": "sample-1",
-            "job_name": "BAI2_File_Import",
-            "environment": "PROD",
-            "server": "BHSIEAS32",
-            "received_time": "21:25",
-            "status": "READY",
-            "occurrence_count": 4,
-            "duplicate": True,
-            "selected": True,
-            "analysis": {
-                "failure_stage": "Execution",
-                "root_cause": "The VB Script failed due to missing file permissions.",
-                "business_impact": "Batch delivery was delayed and downstream reporting was affected.",
-                "technical_impact": "The job stopped before final file handoff.",
-                "recommended_resolution": "Fix the permissions and rerun the batch process.",
-                "confidence_score": 91,
-            },
-            "email": {
-                "subject": "RCA - BAI2_File_Import Failure - PROD",
-                "body": "Dear Team,\n\nThe scheduled VisualCron job BAI2_File_Import failed in PROD. The root cause has been identified as missing file permissions.\n\nRegards,\nAI L1 Support Agent",
-            },
+def _empty_failure_item() -> dict[str, Any]:
+    return {
+        "id": None,
+        "job_name": "No Failure Events",
+        "environment": "",
+        "server": "",
+        "received_time": "",
+        "status": "NEW",
+        "workflow_status": "No Failure Events",
+        "occurrence_count": 0,
+        "duplicate": False,
+        "selected": True,
+        "analysis": {
+            "failure_stage": "No Failure Events",
+            "root_cause": "No Failure Events",
+            "business_impact": "No Failure Events",
+            "technical_impact": "No Failure Events",
+            "recommended_resolution": "No Failure Events",
+            "confidence_score": 0,
         },
-        {
-            "id": "sample-2",
-            "job_name": "GL_Invoice_Publish",
-            "environment": "UAT",
-            "server": "APPSRV02",
-            "received_time": "19:42",
-            "status": "NEW",
-            "occurrence_count": 1,
-            "duplicate": False,
-            "selected": False,
-            "analysis": {
-                "failure_stage": "Validation",
-                "root_cause": "The payload schema changed and the mapping rule rejected the file.",
-                "business_impact": "Invoice publication was paused for the current cycle.",
-                "technical_impact": "The downstream consumer did not receive the expected payload.",
-                "recommended_resolution": "Align the schema mapping and rerun the publish job.",
-                "confidence_score": 87,
-            },
-            "email": {
-                "subject": "RCA - GL_Invoice_Publish Failure - UAT",
-                "body": "Dear Team,\n\nThe publish job stopped because the file structure did not match the required mapping.\n\nRegards,\nAI L1 Support Agent",
-            },
+        "email": {
+            "subject": "No Failure Events",
+            "body": "No Failure Events",
         },
-    ]
+        "icon": _status_icon("NEW"),
+    }
 
 
 def _build_queue_items() -> list[dict[str, Any]]:
@@ -104,8 +81,10 @@ def _build_queue_items() -> list[dict[str, Any]]:
         logger.exception("Failed to load queue items for dashboard")
         records = []
 
+    logger.info("Loading %d failures into the dashboard queue", len(records))
     if not records:
-        return _fallback_queue_items()
+        logger.info("QueueManager returned no failures; rendering empty queue state")
+        return []
 
     queue_items: list[dict[str, Any]] = []
     for record in records:
@@ -129,6 +108,7 @@ def _build_queue_items() -> list[dict[str, Any]]:
                 "server": record.server,
                 "received_time": record.received_time,
                 "status": record.status,
+                "workflow_status": record.status,
                 "occurrence_count": record.occurrence_count,
                 "duplicate": record.occurrence_count > 1,
                 "selected": False,
@@ -143,14 +123,33 @@ def _build_queue_items() -> list[dict[str, Any]]:
     return queue_items
 
 
-def _build_view_context() -> dict[str, Any]:
+def _build_view_context(selected_failure_id: str | None = None) -> dict[str, Any]:
     queue_items = _build_queue_items()
-    selected_failure = next((item for item in queue_items if item.get("selected")), queue_items[0] if queue_items else None)
+    empty_queue = not queue_items
+
+    selected_failure = None
+    if not empty_queue:
+        selected_failure = next((item for item in queue_items if item.get("id") == selected_failure_id), None)
+        if selected_failure is None:
+            selected_failure = next((item for item in queue_items if item.get("selected")), queue_items[0])
+    if selected_failure is None:
+        selected_failure = _empty_failure_item()
+        selected_failure_id = None
+
+    if not empty_queue and selected_failure.get("id") is not None:
+        selected_failure["approve_enabled"] = selected_failure["status"] == "READY"
+        selected_failure["reject_enabled"] = selected_failure["status"] == "READY"
+        selected_failure["reopen_enabled"] = selected_failure["status"] in {"APPROVED", "REJECTED"}
+    else:
+        selected_failure["approve_enabled"] = False
+        selected_failure["reject_enabled"] = False
+        selected_failure["reopen_enabled"] = False
 
     pending_count = sum(1 for item in queue_items if item["status"] in {"NEW", "ANALYZING"})
     ready_count = sum(1 for item in queue_items if item["status"] == "READY")
     approved_count = sum(1 for item in queue_items if item["status"] == "APPROVED")
     rejected_count = sum(1 for item in queue_items if item["status"] == "REJECTED")
+    sent_count = sum(1 for item in queue_items if item["status"] == "SENT")
 
     workflow_steps = [
         {"label": "Failure Received", "state": "completed"},
@@ -162,19 +161,23 @@ def _build_view_context() -> dict[str, Any]:
 
     if _approval_state["is_finalized"] and _approval_state["is_approved"]:
         status_message = "Approved. Waiting to Send"
-    elif _approval_state["is_finalized"]:
+    elif _approval_state["is_finalized"] and _approval_state["status"] == "Rejected":
         status_message = "Rejected by Engineer. Email will not be sent"
+    elif _approval_state["is_finalized"] and _approval_state["status"] == "Reopened":
+        status_message = "Reopened. Waiting for review"
     else:
         status_message = "Operations console ready for review"
 
     return {
         "queue_items": queue_items,
         "selected_failure": selected_failure,
+        "empty_queue": empty_queue,
         "stats": {
             "pending": pending_count,
             "ready": ready_count,
             "approved": approved_count,
             "rejected": rejected_count,
+            "sent": sent_count,
             "queue_size": len(queue_items),
             "queue_capacity": 20,
         },
@@ -183,37 +186,147 @@ def _build_view_context() -> dict[str, Any]:
         "confirmation_message": _approval_state["message"] if _approval_state["is_finalized"] else "",
         "approval_finalized": _approval_state["is_finalized"],
         "status_message": status_message,
+        "selected_failure_id": selected_failure_id,
     }
+
+
+def _get_failure_for_action(failure_id: str | None, queue_manager: QueueManager | None = None) -> Any | None:
+    manager = queue_manager or QueueManager()
+    if failure_id:
+        return manager.get_failure(failure_id)
+    return next(iter(manager.list_failures()), None)
+
+
+def _apply_decision(action: str, failure_id: str | None) -> dict[str, Any]:
+    global _approval_state
+
+    queue_manager = QueueManager()
+    record = _get_failure_for_action(failure_id, queue_manager=queue_manager)
+    if record is None:
+        logger.info("No failure selected for %s decision; rendering notification-only response", action)
+        if action == "approve":
+            _approval_state = {
+                "status": "Approved",
+                "message": "Approved Successfully",
+                "is_finalized": True,
+                "is_approved": True,
+            }
+        elif action == "reject":
+            _approval_state = {
+                "status": "Rejected",
+                "message": "Rejected Successfully",
+                "is_finalized": True,
+                "is_approved": False,
+            }
+        elif action == "reopen":
+            _approval_state = {
+                "status": "Reopened",
+                "message": "Reopened Successfully",
+                "is_finalized": True,
+                "is_approved": False,
+            }
+        else:
+            _approval_state = {
+                "status": "Pending",
+                "message": "No Failure Events",
+                "is_finalized": True,
+                "is_approved": False,
+            }
+        return _build_view_context(failure_id)
+
+    if action == "approve":
+        if record.status != "READY":
+            logger.warning("Rejecting invalid approve transition for %s from %s", record.id, record.status)
+            _approval_state = {
+                "status": "Pending",
+                "message": "Invalid transition",
+                "is_finalized": True,
+                "is_approved": False,
+            }
+            return _build_view_context(record.id)
+        queue_manager.approve(record.id)
+        logger.info("Approved failure %s via dashboard action", record.id)
+        _approval_state = {
+            "status": "Approved",
+            "message": "Approved Successfully",
+            "is_finalized": True,
+            "is_approved": True,
+        }
+        return _build_view_context(record.id)
+
+    if action == "reject":
+        if record.status != "READY":
+            logger.warning("Rejecting invalid reject transition for %s from %s", record.id, record.status)
+            _approval_state = {
+                "status": "Pending",
+                "message": "Invalid transition",
+                "is_finalized": True,
+                "is_approved": False,
+            }
+            return _build_view_context(record.id)
+        queue_manager.reject(record.id)
+        logger.info("Rejected failure %s via dashboard action", record.id)
+        _approval_state = {
+            "status": "Rejected",
+            "message": "Rejected Successfully",
+            "is_finalized": True,
+            "is_approved": False,
+        }
+        return _build_view_context(record.id)
+
+    if action == "reopen":
+        if record.status not in {"APPROVED", "REJECTED"}:
+            logger.warning("Rejecting invalid reopen transition for %s from %s", record.id, record.status)
+            _approval_state = {
+                "status": "Pending",
+                "message": "Invalid transition",
+                "is_finalized": True,
+                "is_approved": False,
+            }
+            return _build_view_context(record.id)
+        record.status = "READY"
+        queue_manager.save()
+        logger.info("Reopened failure %s via dashboard action", record.id)
+        _approval_state = {
+            "status": "Reopened",
+            "message": "Reopened Successfully",
+            "is_finalized": True,
+            "is_approved": False,
+        }
+        return _build_view_context(record.id)
+
+    logger.warning("Unsupported dashboard action requested: %s", action)
+    _approval_state = {
+        "status": "Pending",
+        "message": "Invalid action",
+        "is_finalized": True,
+        "is_approved": False,
+    }
+    return _build_view_context(failure_id)
 
 
 @app.route("/")
 def index() -> str:
-    context = _build_view_context()
+    context = _build_view_context(request.args.get("failure_id"))
     return render_template("index.html", **context)
 
 
 @app.post("/approve")
-def approve() -> str:
-    global _approval_state
-    _approval_state = {
-        "status": "Approved",
-        "message": "Approved Successfully",
-        "is_finalized": True,
-        "is_approved": True,
-    }
-    return render_template("index.html", **_build_view_context())
+@app.post("/approve/<failure_id>")
+def approve(failure_id: str | None = None) -> str:
+    return render_template("index.html", **_apply_decision("approve", failure_id))
 
 
 @app.post("/reject")
-def reject() -> str:
-    global _approval_state
-    _approval_state = {
-        "status": "Rejected",
-        "message": "Rejected Successfully",
-        "is_finalized": True,
-        "is_approved": False,
-    }
-    return render_template("index.html", **_build_view_context())
+@app.post("/reject/<failure_id>")
+def reject(failure_id: str | None = None) -> str:
+    return render_template("index.html", **_apply_decision("reject", failure_id))
+
+
+@app.post("/reopen")
+@app.post("/reopen/<failure_id>")
+def reopen(failure_id: str | None = None) -> str:
+    return render_template("index.html", **_apply_decision("reopen", failure_id))
 
 
 if __name__ == "__main__":
