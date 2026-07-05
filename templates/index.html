@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VisualCron AI L1 Support Agent</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script>
+        function formatClock(date, timeZone) {
+            const dateFormatter = new Intl.DateTimeFormat('en-GB', {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                timeZone,
+            });
+            const timeFormatter = new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true,
+                timeZone,
+            });
+            return {
+                date: dateFormatter.format(date).replace(/ /g, '-'),
+                time: timeFormatter.format(date),
+            };
+        }
+
+        function updateClocks() {
+            const now = new Date();
+            const ist = formatClock(now, 'Asia/Kolkata');
+            const cst = formatClock(now, 'America/Chicago');
+
+            document.getElementById('ist-date').textContent = ist.date;
+            document.getElementById('ist-time').textContent = ist.time;
+            document.getElementById('cst-date').textContent = cst.date;
+            document.getElementById('cst-time').textContent = cst.time;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateClocks();
+            setInterval(updateClocks, 1000);
+
+            const queueItems = Array.from(document.querySelectorAll('.queue-item'));
+            const selectedJob = document.getElementById('selected-job');
+            const selectedMeta = document.getElementById('selected-meta');
+            const selectedStatus = document.getElementById('selected-status');
+            const selectedSubject = document.getElementById('selected-subject');
+            const selectedBody = document.getElementById('selected-body');
+            const analysisStage = document.getElementById('analysis-stage');
+            const analysisRootCause = document.getElementById('analysis-root-cause');
+            const analysisBusinessImpact = document.getElementById('analysis-business-impact');
+            const analysisTechnicalImpact = document.getElementById('analysis-technical-impact');
+            const analysisResolution = document.getElementById('analysis-resolution');
+            const analysisConfidence = document.getElementById('analysis-confidence');
+            const actionFeedback = document.getElementById('action-feedback');
+
+            const updateDetail = (item) => {
+                selectedJob.textContent = item.dataset.jobName;
+                selectedMeta.textContent = `${item.dataset.environment} • ${item.dataset.server}`;
+                selectedStatus.textContent = item.dataset.status;
+                selectedSubject.textContent = `Subject: ${item.dataset.subject}`;
+                selectedBody.textContent = item.dataset.body;
+                analysisStage.textContent = item.dataset.stage;
+                analysisRootCause.textContent = item.dataset.rootCause;
+                analysisBusinessImpact.textContent = item.dataset.businessImpact;
+                analysisTechnicalImpact.textContent = item.dataset.technicalImpact;
+                analysisResolution.textContent = item.dataset.recommendedResolution;
+                analysisConfidence.textContent = `${item.dataset.confidenceScore} / 100`;
+            };
+
+            queueItems.forEach((item) => {
+                item.addEventListener('click', () => {
+                    queueItems.forEach((entry) => entry.classList.remove('selected'));
+                    item.classList.add('selected');
+                    updateDetail(item);
+                    actionFeedback.textContent = `Viewing ${item.dataset.jobName}`;
+                });
+            });
+
+            document.querySelectorAll('.action-button').forEach((button) => {
+                button.addEventListener('click', () => {
+                    actionFeedback.textContent = `${button.dataset.action} selected for ${selectedJob.textContent}`;
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+    <div class="page-shell">
+        <header class="header-card header-grid">
+            <div class="header-main">
+                <div class="header-icon">🤖</div>
+                <div>
+                    <p class="eyebrow">VisualCron AI L1 Support Agent</p>
+                    <h1>Enterprise L1 Production Support Automation</h1>
+                    <div class="header-info-bar">
+                        <div class="info-block">
+                            <span class="info-label-inline">🇮🇳 IST</span>
+                            <span class="info-meta" id="ist-date">04-Jul-2026</span>
+                            <span class="info-meta info-time" id="ist-time">04:05:22 PM</span>
+                        </div>
+                        <div class="info-separator">|</div>
+                        <div class="info-block">
+                            <span class="info-label-inline">🇺🇸 CST</span>
+                            <span class="info-meta" id="cst-date">04-Jul-2026</span>
+                            <span class="info-meta info-time" id="cst-time">05:15:12 AM</span>
+                        </div>
+                        <div class="info-separator">|</div>
+                        <div class="info-block">
+                            <span class="info-label-inline">👤 AI Service Account</span>
+                        </div>
+                        <div class="info-separator">|</div>
+                        <div class="info-block status-block">
+                            <span class="info-label-inline">🟢 Monitoring</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section class="ops-console">
+            <aside class="card queue-panel">
+                <div class="queue-panel-header">
+                    <div>
+                        <h2>Failure Queue</h2>
+                        <p class="panel-caption">Operational review workspace</p>
+                    </div>
+                    <div class="queue-summary-pill">Queue {{ stats.queue_size }} / {{ stats.queue_capacity }}</div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-pill">
+                        <span>Pending</span>
+                        <strong>{{ stats.pending }}</strong>
+                    </div>
+                    <div class="stat-pill">
+                        <span>Ready</span>
+                        <strong>{{ stats.ready }}</strong>
+                    </div>
+                    <div class="stat-pill">
+                        <span>Approved</span>
+                        <strong>{{ stats.approved }}</strong>
+                    </div>
+                    <div class="stat-pill">
+                        <span>Rejected</span>
+                        <strong>{{ stats.rejected }}</strong>
+                    </div>
+                </div>
+
+                <div class="queue-list">
+                    {% for item in queue_items %}
+                    <button
+                        class="queue-item{% if item.selected %} selected{% endif %}"
+                        type="button"
+                        data-job-name="{{ item.job_name }}"
+                        data-environment="{{ item.environment }}"
+                        data-server="{{ item.server }}"
+                        data-status="{{ item.status }}"
+                        data-subject="{{ item.email.subject }}"
+                        data-body="{{ item.email.body }}"
+                        data-stage="{{ item.analysis.failure_stage }}"
+                        data-root-cause="{{ item.analysis.root_cause }}"
+                        data-business-impact="{{ item.analysis.business_impact }}"
+                        data-technical-impact="{{ item.analysis.technical_impact }}"
+                        data-recommended-resolution="{{ item.analysis.recommended_resolution }}"
+                        data-confidence-score="{{ item.analysis.confidence_score }}"
+                    >
+                        <div class="queue-item-top">
+                            <span class="queue-icon">{{ item.icon }}</span>
+                            <div class="queue-item-title">
+                                <strong>{{ item.job_name }}</strong>
+                                <span>{{ item.environment }} • {{ item.server }}</span>
+                            </div>
+                        </div>
+                        <div class="queue-item-meta">
+                            <span>{{ item.received_time }}</span>
+                            <span class="queue-status">{{ item.status }}</span>
+                        </div>
+                        {% if item.duplicate %}
+                        <div class="duplicate-badge">Duplicate ×{{ item.occurrence_count }}</div>
+                        {% else %}
+                        <div class="occurrence-count">Occurrence {{ item.occurrence_count }}</div>
+                        {% endif %}
+                    </button>
+                    {% endfor %}
+                </div>
+            </aside>
+
+            <div class="detail-stack">
+                <article class="card detail-card">
+                    <div class="detail-card-header">
+                        <div>
+                            <h2>AI Analysis</h2>
+                            <p class="panel-caption" id="selected-meta">{{ selected_failure.environment }} • {{ selected_failure.server }}</p>
+                        </div>
+                        <div class="detail-status-chip" id="selected-status">{{ selected_failure.status }}</div>
+                    </div>
+                    <div class="detail-primary">
+                        <h3 id="selected-job">{{ selected_failure.job_name }}</h3>
+                        <p class="detail-caption">Operational review for the selected failure queue item.</p>
+                    </div>
+                    <div class="field-stack">
+                        <div class="field-row compact"><span>Failure Stage</span><strong id="analysis-stage">{{ selected_failure.analysis.failure_stage }}</strong></div>
+                        <div class="field-row compact"><span>Root Cause</span><strong id="analysis-root-cause">{{ selected_failure.analysis.root_cause }}</strong></div>
+                        <div class="field-row compact"><span>Business Impact</span><strong id="analysis-business-impact">{{ selected_failure.analysis.business_impact }}</strong></div>
+                        <div class="field-row compact"><span>Technical Impact</span><strong id="analysis-technical-impact">{{ selected_failure.analysis.technical_impact }}</strong></div>
+                        <div class="field-row compact"><span>Recommended Resolution</span><strong id="analysis-resolution">{{ selected_failure.analysis.recommended_resolution }}</strong></div>
+                        <div class="field-row compact"><span>Confidence Score</span><strong id="analysis-confidence">{{ selected_failure.analysis.confidence_score }} / 100</strong></div>
+                    </div>
+                </article>
+
+                <article class="card detail-card">
+                    <h2>Client Email</h2>
+                    <div class="email-subject" id="selected-subject">Subject: {{ selected_failure.email.subject }}</div>
+                    <div class="email-divider"></div>
+                    <div class="email-body">
+                        <p id="selected-body">{{ selected_failure.email.body }}</p>
+                    </div>
+                </article>
+
+                <article class="card detail-card action-card">
+                    <div class="detail-card-header">
+                        <div>
+                            <h2>Decision</h2>
+                            <p class="panel-caption">Approval state and action center</p>
+                        </div>
+                        <div class="detail-status-chip">{{ approval_status }}</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="button button-approve action-button" type="button" data-action="Approve">Approve</button>
+                        <button class="button button-reject action-button" type="button" data-action="Reject">Reject</button>
+                        <button class="button button-refresh action-button" type="button" data-action="Reset">Reset</button>
+                        <button class="button button-logs action-button" type="button" data-action="View Logs">View Logs</button>
+                        <button class="button button-refresh action-button" type="button" data-action="Refresh Queue">Refresh Queue</button>
+                    </div>
+                    <div class="action-feedback" id="action-feedback">Selection ready for review</div>
+                    <div class="status-message">{{ status_message }}</div>
+                    {% if confirmation_message %}
+                    <div class="confirmation-banner">{{ confirmation_message }}</div>
+                    {% endif %}
+                </article>
+            </div>
+        </section>
+
+        <section class="section-grid">
+            <article class="card workflow-card">
+                <h2>Workflow Progress</h2>
+                {% for step in workflow_steps %}
+                <div class="step-row step-{{ step.state }}">
+                    <span>{% if step.state == 'completed' %}✓{% else %}○{% endif %}</span> {{ step.label }}
+                </div>
+                {% endfor %}
+                <div class="status-message">{{ status_message }}</div>
+            </article>
+        </section>
+    </div>
+</body>
+</html>
